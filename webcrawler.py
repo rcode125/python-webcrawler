@@ -56,12 +56,16 @@ class WebCrawler:
             logger.warning(f"robots.txt konnte nicht geladen werden: {e}. Erlaube standardmäßig alles.")
             self.robot_parser = None
 
-        # Existierende URLs aus JSON laden zur Duplikatvermeidung
-        self.load_existing_data()
-
         # Set zur Verhinderung mehrfacher Einträge in der Queue
-        # speichere normalisierte URLs in der Queue-Set
+        # speichere normalisierte URLs in der Queue-Set (frühzeitig initialisieren)
         self.to_visit_set = {self.normalize_url(u) for u in self.to_visit}
+
+        # Existierende URLs aus JSON laden zur Duplikatvermeidung
+        try:
+            self.load_existing_data()
+        except Exception:
+            # load_existing_data intern loggt Fehler; wir stellen sicher, dass __init__ weiterläuft
+            logger.exception("Fehler beim Laden vorhandener Daten in __init__")
 
     def load_existing_data(self):
         if os.path.exists(self.json_file):
@@ -183,8 +187,8 @@ class WebCrawler:
         try:
             while self.to_visit and len(self.visited) < self.max_pages:
                 url = self.to_visit.popleft()
-                # aus Queue-Set entfernen (falls vorhanden)
-                self.to_visit_set.discard(url)
+                # aus Queue-Set entfernen (falls vorhanden) - nutze normalisierte Form
+                self.to_visit_set.discard(self.normalize_url(url))
                 norm_url = self.normalize_url(url)
                 if norm_url in self.visited:
                     continue
