@@ -142,7 +142,8 @@ class WebCrawler:
             response = requests.get(url, headers=self.headers, timeout=10)
             response.raise_for_status()
             return response.text
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
+            # Catch all exceptions (network errors, mocked exceptions, etc.)
             logger.error(f"Fehler beim Abrufen von {url}: {e}")
             return None
 
