@@ -255,6 +255,31 @@ class WebCrawler:
         }
 
 
+
+def clean_json_file(json_file, normalizer):
+    if not os.path.exists(json_file):
+        print(f"Datei {json_file} nicht gefunden.")
+        return
+    try:
+        with open(json_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        seen = set()
+        deduped = []
+        for item in data:
+            url = item.get("url")
+            if not url:
+                continue
+            norm = normalizer(url)
+            if norm in seen:
+                continue
+            seen.add(norm)
+            deduped.append(item)
+        with open(json_file, "w", encoding="utf-8") as f:
+            json.dump(deduped, f, indent=2, ensure_ascii=False)
+        print(f"{len(deduped)} eindeutige Einträge in {json_file} gespeichert.")
+    except Exception as e:
+        print(f"Fehler beim Bereinigen: {e}")
+
 def main():
     parser = argparse.ArgumentParser(description="Einfacher Webcrawler")
     parser.add_argument("--start-url", default="https://github.com", help="Start-URL zum Crawlen")
@@ -262,7 +287,14 @@ def main():
     parser.add_argument("--delay", type=float, default=1.0, help="Delay zwischen Anfragen in Sekunden")
     parser.add_argument("--json-file", default="crawled_data.json", help="JSON-Datei zum Speichern der Ergebnisse")
     parser.add_argument("--no-save", action="store_true", help="Speichert die Ergebnisse nicht in der JSON-Datei")
+    parser.add_argument("--clean-json", action="store_true", help="Bereinigt die JSON-Datei und beendet das Programm")
     args = parser.parse_args()
+
+    if args.clean_json:
+        # Nur die Datei bereinigen und beenden
+        # Wir nutzen die Normalisierungsmethode der Klasse
+        clean_json_file(args.json_file, WebCrawler.normalize_url)
+        return
 
     crawler = WebCrawler(
         start_url=args.start_url,
