@@ -35,6 +35,7 @@ class WebCrawler:
         }
 
         self.domain = urlparse(start_url).netloc
+        self.domain = urlparse(start_url).netloc
 
         # robots.txt einlesen (sicher mit timeout, damit es nicht hängt)
         self.robot_parser = None
@@ -59,39 +60,64 @@ class WebCrawler:
         self.load_existing_data()
 
         # Set zur Verhinderung mehrfacher Einträge in der Queue
-        self.to_visit_set = set(self.to_visit)
+        # speichere normalisierte URLs in der Queue-Set
+        self.to_visit_set = {self.normalize_url(u) for u in self.to_visit}
 
     def load_existing_data(self):
         if os.path.exists(self.json_file):
             try:
                 with open(self.json_file, "r", encoding="utf-8") as f:
                     existing = json.load(f)
-                    self.data = existing
+                    # normalize and dedupe existing entries
+                    seen = set()
+                    deduped = []
                     for item in existing:
-                        self.visited.add(item.get("url"))
+                        url = item.get("url")
+                        if not url:
+                            continue
+                        norm = self.normalize_url(url)
+                        if norm in seen:
+                            continue
+                        seen.add(norm)
+                        deduped.append(item)
+                        self.visited.add(norm)
+                    self.data = deduped
                 logger.info(f"{len(self.visited)} URLs aus {self.json_file} geladen zum Vermeiden von Duplikaten")
             except Exception as e:
                 logger.error(f"Fehler beim Laden vorhandener Daten: {e}")
+
+    def normalize_url(self, url: str) -> str:
+        try:
+            parsed = urlparse(url)
+            no_frag = parsed._replace(fragment="")
+            norm = no_frag.geturl()
+            # remove trailing slash for non-root paths
+            if norm.endswith('/') and no_frag.path not in ('', '/'):
+                norm = norm.rstrip('/')
+            return norm
+        except Exception:
+            return url
 
     def can_fetch(self, url):
         # wenn kein Robotparser verfügbar ist, erlauben wir das Crawlen
         try:
             if not self.robot_parser:
                 return True
-            return self.robot_parser.can_fetch(self.headers["User-Agent"], url)
+            return self.robot_parser.can_fetch(self.headers["User-Agent"], self.normalize_url(url))
         except Exception:
             return True
 
     def is_valid_url(self, url):
         try:
             parsed = urlparse(url)
-            clean_url = parsed._replace(fragment="").geturl()
-            return (
-                parsed.scheme in ("http", "https")
-                and parsed.netloc == self.domain
-                and clean_url not in self.visited
-                and self.can_fetch(clean_url)
-            )
+            if parsed.scheme not in ("http", "https"):
+                return False
+            if parsed.netloc != self.domain:
+                return False
+            clean = self.normalize_url(url)
+            if clean in self.visited:
+                return False
+            return self.can_fetch(clean)
         except Exception:
             return False
 
@@ -101,10 +127,11 @@ class WebCrawler:
             soup = BeautifulSoup(html, "html.parser")
             for link in soup.find_all("a", href=True):
                 absolute_url = urljoin(url, link["href"])
+                norm = self.normalize_url(absolute_url)
                 # nur hinzufügen, wenn gültig und noch nicht in Queue/visited
-                if self.is_valid_url(absolute_url) and absolute_url not in self.to_visit_set:
+                if self.is_valid_url(absolute_url) and norm not in self.to_visit_set:
                     links.append(absolute_url)
-                    self.to_visit_set.add(absolute_url)
+                    self.to_visit_set.add(norm)
         except Exception as e:
             logger.error(f"Fehler beim Extrahieren von Links: {e}")
         return links
@@ -150,7 +177,7 @@ class WebCrawler:
     def crawl(self):
         logger.info(f"Starte Crawler mit: {self.start_url}")
         # Wenn Start-URL bereits gecrawlt wurde, nichts tun
-        if self.start_url in self.visited:
+        if self.normalize_url(self.start_url) in self.visited:
             logger.info(f"Start-URL {self.start_url} bereits gecrawlt — Abbruch.")
             return self.data
         try:
@@ -158,10 +185,11 @@ class WebCrawler:
                 url = self.to_visit.popleft()
                 # aus Queue-Set entfernen (falls vorhanden)
                 self.to_visit_set.discard(url)
-                if url in self.visited:
+                norm_url = self.normalize_url(url)
+                if norm_url in self.visited:
                     continue
-                self.visited.add(url)
-                logger.info(f"Crawle ({len(self.visited)}/{self.max_pages}): {url}")
+                self.visited.add(norm_url)
+                logger.info(f"Crawle ({len(self.visited)}/{self.max_pages}): {norm_url}")
 
                 html = self.fetch_page(url)
                 if not html:
@@ -194,9 +222,18 @@ class WebCrawler:
                         existing_data = json.load(f)
                     except json.JSONDecodeError:
                         existing_data = []
-            # neue, nicht vorhandene Daten anhängen
-            urls_in_existing = {item["url"] for item in existing_data}
-            new_items = [item for item in self.data if item["url"] not in urls_in_existing]
+            # normalize urls in existing and current data, avoid duplicates
+            urls_in_existing = {self.normalize_url(item.get("url", "")) for item in existing_data}
+            new_items = []
+            for item in self.data:
+                url = item.get("url")
+                if not url:
+                    continue
+                norm = self.normalize_url(url)
+                if norm in urls_in_existing:
+                    continue
+                urls_in_existing.add(norm)
+                new_items.append(item)
             all_data = existing_data + new_items
 
             with open(self.json_file, "w", encoding="utf-8") as f:
@@ -216,7 +253,7 @@ class WebCrawler:
 
 def main():
     parser = argparse.ArgumentParser(description="Einfacher Webcrawler")
-    parser.add_argument("--start-url", default="https://minecraft.com", help="Start-URL zum Crawlen")
+    parser.add_argument("--start-url", default="https://github.com", help="Start-URL zum Crawlen")
     parser.add_argument("--max-pages", type=int, default=20, help="Maximale Anzahl Seiten zum Crawlen")
     parser.add_argument("--delay", type=float, default=1.0, help="Delay zwischen Anfragen in Sekunden")
     parser.add_argument("--json-file", default="crawled_data.json", help="JSON-Datei zum Speichern der Ergebnisse")
