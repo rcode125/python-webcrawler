@@ -72,13 +72,16 @@ class WebCrawler:
             try:
                 with open(self.json_file, "r", encoding="utf-8") as f:
                     existing = json.load(f)
-                    # normalize and dedupe existing entries
+                    # normalize and dedupe existing entries, but only for current domain
                     seen = set()
                     deduped = []
                     for item in existing:
                         url = item.get("url")
                         if not url:
                             continue
+                        parsed = urlparse(url)
+                        if parsed.netloc != self.domain:
+                            continue  # skip URLs from other domains
                         norm = self.normalize_url(url)
                         if norm in seen:
                             continue
@@ -86,7 +89,7 @@ class WebCrawler:
                         deduped.append(item)
                         self.visited.add(norm)
                     self.data = deduped
-                logger.info(f"{len(self.visited)} URLs aus {self.json_file} geladen zum Vermeiden von Duplikaten")
+                logger.info(f"{len(self.visited)} URLs aus {self.json_file} geladen (nur Domain {self.domain}) zum Vermeiden von Duplikaten")
             except Exception as e:
                 logger.error(f"Fehler beim Laden vorhandener Daten: {e}")
 
