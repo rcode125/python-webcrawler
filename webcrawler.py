@@ -351,7 +351,7 @@ def clean_json_file(json_file, normalizer):
 
 def main():
     parser = argparse.ArgumentParser(description="Einfacher Webcrawler")
-    parser.add_argument("--start-url", default="https://github.com", help="Start-URL zum Crawlen")
+    parser.add_argument("--start-url", default="https://mineraft.com", help="Start-URL zum Crawlen")
     parser.add_argument("--max-pages", type=int, default=20, help="Maximale Anzahl Seiten zum Crawlen")
     parser.add_argument("--delay", type=float, default=1.0, help="Delay zwischen Anfragen in Sekunden")
     parser.add_argument("--json-file", default="crawled_data.json", help="JSON-Datei zum Speichern der Ergebnisse")
