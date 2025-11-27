@@ -9,6 +9,7 @@ from collections import deque
 import os
 import logging
 import argparse
+import sqlite3
 
 logging.basicConfig(
     level=logging.INFO,
@@ -17,7 +18,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class WebCrawler:
-    def __init__(self, start_url, max_pages=50, delay=1, json_file="crawled_data.json"):
+    def __init__(self, start_url, max_pages=50, delay=1, json_file="crawled_data.json", save_to_db=False, db_path="crawled_data.db"):
         self.start_url = start_url
         self.max_pages = max_pages
         self.delay = delay
@@ -25,6 +26,8 @@ class WebCrawler:
         self.to_visit = deque([start_url])
         self.data = []
         self.json_file = json_file
+        self.save_to_db = save_to_db
+        self.db_path = db_path
         
         self.headers = {
             "User-Agent": (
@@ -59,6 +62,13 @@ class WebCrawler:
         # Set zur Verhinderung mehrfacher Einträge in der Queue
         # speichere normalisierte URLs in der Queue-Set (frühzeitig initialisieren)
         self.to_visit_set = {self.normalize_url(u) for u in self.to_visit}
+
+        # optional: SQLite DB initialisieren
+        if self.save_to_db:
+            try:
+                self.init_db()
+            except Exception:
+                logger.exception("Fehler beim Initialisieren der SQLite-DB")
 
         # Existierende URLs aus JSON laden zur Duplikatvermeidung
         try:
@@ -104,6 +114,57 @@ class WebCrawler:
             return norm
         except Exception:
             return url
+
+    def init_db(self):
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cur = conn.cursor()
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS crawled (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    url TEXT UNIQUE,
+                    title TEXT,
+                    description TEXT,
+                    headings TEXT,
+                    paragraphs TEXT,
+                    link_count INTEGER,
+                    crawled_at TEXT
+                )
+                """
+            )
+            conn.commit()
+            conn.close()
+            logger.info(f"SQLite DB initialisiert: {self.db_path}")
+        except Exception as e:
+            logger.error(f"Fehler beim Initialisieren der DB {self.db_path}: {e}")
+
+    def save_record_to_db(self, record: dict):
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cur = conn.cursor()
+            headings_json = json.dumps(record.get("headings", []), ensure_ascii=False)
+            paragraphs_json = json.dumps(record.get("paragraphs", []), ensure_ascii=False)
+            cur.execute(
+                """
+                INSERT OR IGNORE INTO crawled (url, title, description, headings, paragraphs, link_count, crawled_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record.get("url"),
+                    record.get("title"),
+                    record.get("description"),
+                    headings_json,
+                    paragraphs_json,
+                    record.get("link_count"),
+                    record.get("crawled_at"),
+                ),
+            )
+            conn.commit()
+            conn.close()
+            logger.debug(f"Datensatz in DB gespeichert: {record.get('url')}")
+        except Exception as e:
+            logger.error(f"Fehler beim Speichern in DB: {e}")
 
     def can_fetch(self, url):
         # wenn kein Robotparser verfügbar ist, erlauben wir das Crawlen
@@ -206,6 +267,11 @@ class WebCrawler:
                     # Prüfen, ob bereits im data, um Duplikate zu vermeiden
                     if not any(d["url"] == content["url"] for d in self.data):
                         self.data.append(content)
+                        if self.save_to_db:
+                            try:
+                                self.save_record_to_db(content)
+                            except Exception:
+                                logger.exception("Fehler beim Speichern eines Eintrags in die DB")
 
                 links = self.extract_links(url, html)
                 self.to_visit.extend(links)
@@ -289,6 +355,8 @@ def main():
     parser.add_argument("--max-pages", type=int, default=20, help="Maximale Anzahl Seiten zum Crawlen")
     parser.add_argument("--delay", type=float, default=1.0, help="Delay zwischen Anfragen in Sekunden")
     parser.add_argument("--json-file", default="crawled_data.json", help="JSON-Datei zum Speichern der Ergebnisse")
+    parser.add_argument("--save-to-db", action="store_true", help="Speichert Ergebnisse zusätzlich in einer SQLite .db Datei")
+    parser.add_argument("--db-file", default="crawled_data.db", help="Pfad zur SQLite DB-Datei")
     parser.add_argument("--no-save", action="store_true", help="Speichert die Ergebnisse nicht in der JSON-Datei")
     parser.add_argument("--clean-json", action="store_true", help="Bereinigt die JSON-Datei und beendet das Programm")
     args = parser.parse_args()
@@ -304,6 +372,8 @@ def main():
         max_pages=args.max_pages,
         delay=args.delay,
         json_file=args.json_file,
+        save_to_db=args.save_to_db,
+        db_path=args.db_file,
     )
     data = crawler.crawl()
     if not args.no_save:
