@@ -42,7 +42,7 @@ class CrawlResultAdmin(admin.ModelAdmin):
 
 @admin.register(DeleteRequest)
 class DeleteRequestAdmin(admin.ModelAdmin):
-    list_display = ("user", "request_type", "value", "created_at", "processed")
+    list_display = ("request_type", "value", "created_at", "processed")
     list_filter = ("request_type", "processed")
     actions = ["process_requests"]
 
@@ -66,6 +66,7 @@ class DeleteRequestAdmin(admin.ModelAdmin):
             count += 1
 
         self.message_user(request, f"{count} Anfragen verarbeitet.", messages.SUCCESS)
+
 
 
 @admin.register(CrawlLog)
