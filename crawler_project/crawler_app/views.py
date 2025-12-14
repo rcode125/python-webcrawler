@@ -45,10 +45,9 @@ def start_crawl(request):
             crawler = WebCrawler(
                 start_url=start_url,
                 max_pages=form.cleaned_data["max_pages"],
-                delay=form.cleaned_data["delay"],
-                save_to_db=True,
-                db_path="db.sqlite3"   # ✅ wichtig: Django DB nutzen
+                delay=form.cleaned_data["delay"]
             )
+
 
             total = form.cleaned_data["max_pages"]
 
@@ -57,17 +56,19 @@ def start_crawl(request):
                 progress = int(((i + 1) / total) * 100)
 
                 # ✅ Ergebnis speichern
-                CrawlResult.objects.create(
-                    user=request.user,
-                    url=item["url"],
-                    title=item["title"],
-                    description=item["description"],
-                    headings=item["headings"],
-                    paragraphs=item["paragraphs"],
-                    link_count=item["link_count"],
-                    crawled_at=timezone.now(),
-                    status_code=item.get("status_code", 200)
+                CrawlResult.objects.update_or_create(
+                    url=data["url"],
+                    defaults={
+                    "title": data["title"],
+                    "description": data["description"],
+                    "headings": data["headings"],
+                    "paragraphs": data["paragraphs"],
+                    "link_count": data["link_count"],
+                    "status_code": data["status_code"],
+                    "crawled_at": timezone.now(),
+                    }
                 )
+
 
                 # ✅ Log für jede gecrawlte Seite
                 CrawlLog.objects.create(
