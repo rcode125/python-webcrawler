@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>FTS5 + BM25 Search Engine Test</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/sql-wasm.js"></script>
+</head>
+<body>
+
+<h1>SQLite FTS5 + BM25 Suchmaschine</h1>
+
+<!-- DB Upload -->
+<input type="file" id="dbfile" />
+<br><br>
+
+<!-- Suchfeld -->
+<input type="text" id="query" placeholder="Suchbegriff eingeben..." style="width:300px;">
+<button onclick="search()">Suchen</button>
+
+<h2>Ergebnisse:</h2>
+<div id="results"></div>
+
+<script>
+let db = null;
+
+// ✅ Datenbank laden
+document.getElementById("dbfile").addEventListener("change", async function() {
+    const file = this.files[0];
+    const arrayBuffer = await file.arrayBuffer();
+    const SQL = await initSqlJs({
+        locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/${file}`
+    });
+    db = new SQL.Database(new Uint8Array(arrayBuffer));
+    alert("Datenbank geladen!");
+});
+
+// ✅ Suche mit FTS5 + BM25
+function search() {
+    if (!db) {
+        alert("Bitte zuerst db.sqlite3 hochladen!");
+        return;
+    }
+
+    const q = document.getElementById("query").value;
+
+    const stmt = db.prepare(`
+        SELECT 
+            url, 
+            title, 
+            snippet(crawled_fts, 2, '<b>', '</b>', '...', 20) AS snippet,
+            bm25(crawled_fts) AS score
+        FROM crawled_fts
+        WHERE crawled_fts MATCH ?
+        ORDER BY score
+        LIMIT 20;
+    `);
+
+    stmt.bind([q]);
+
+    let html = "<ul>";
+    while (stmt.step()) {
+        const row = stmt.getAsObject();
+        html += `
+            <li>
+                <b>${row.title}</b><br>
+                <a href="${row.url}" target="_blank">${row.url}</a><br>
+                <i>Score: ${row.score.toFixed(2)}</i><br>
+                ${row.snippet}
+            </li><br>
+        `;
+    }
+    html += "</ul>";
+
+    document.getElementById("results").innerHTML = html;
+}
+</script>
+
+</body>
+</html>

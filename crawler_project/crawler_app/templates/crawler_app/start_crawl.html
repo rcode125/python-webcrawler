@@ -1,0 +1,30 @@
+{% extends "crawler_app/base.html" %}
+
+
+{% block title %}Crawl starten{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="card shadow">
+      <div class="card-body">
+        <h2 class="card-title mb-4">Crawl starten</h2>
+        <form method="post">
+          {% csrf_token %}
+          {{ form.as_p }}
+          <button type="submit" class="btn btn-primary w-100">Crawl</button>
+        </form>
+
+        <!-- Fortschrittsbalken -->
+        <div class="progress mt-4">
+          <div class="progress-bar progress-bar-striped progress-bar-animated"
+               role="progressbar"
+               style="width: {{ progress }}%">
+            {{ progress }}%
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,64 @@
+{% extends "crawler_app/base.html" %}
+
+{% block content %}
+
+<h1>Dashboard</h1>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+{% endif %}
+
+<!-- ✅ CRAWL BUTTON -->
+<a href="{% url 'start_crawl' %}" class="btn btn-primary mb-3">
+    🔍 Neue Seite crawlen
+</a>
+
+<!-- ✅ DELETE REQUEST BUTTON -->
+<a href="{% url 'request_delete' %}" class="btn btn-danger mb-3">
+    ❌ Löschanfrage an Admin senden
+</a>
+
+<h2>Deine Crawl-Ergebnisse</h2>
+
+{% if results %}
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>URL</th>
+            <th>Titel</th>
+            <th>Status</th>
+            <th>Links</th>
+            <th>Datum</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for r in results %}
+        <tr>
+            <td>{{ r.url }}</td>
+            <td>{{ r.title }}</td>
+            <td>{{ r.status_code }}</td>
+            <td>{{ r.link_count }}</td>
+            <td>{{ r.crawled_at }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>Noch keine Ergebnisse.</p>
+{% endif %}
+
+<hr>
+
+<h2>Aktivitäts‑Log</h2>
+
+<div style="max-height: 300px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 5px;">
+    {% for log in logs %}
+        <div><strong>{{ log.created_at|date:"H:i:s" }}</strong> — {{ log.message }}</div>
+    {% empty %}
+        <p>Noch keine Aktivitäten.</p>
+    {% endfor %}
+</div>
+
+{% endblock %}
