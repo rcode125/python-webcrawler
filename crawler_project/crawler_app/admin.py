@@ -5,9 +5,10 @@ from .crawler_tools import delete_url, delete_domain, delete_all, delete_404
 
 @admin.register(CrawlResult)
 class CrawlResultAdmin(admin.ModelAdmin):
-    list_display = ("id", "user", "url", "title", "status_code", "link_count", "crawled_at")
-    list_filter = ("user", "status_code", "crawled_at")
-    search_fields = ("url", "title", "description", "user__username")
+    list_display = ("id", "url", "title", "status_code", "link_count", "crawled_at")
+    list_filter = ("status_code", "crawled_at")
+    search_fields = ("url", "title", "description")
+
 
     readonly_fields = ("crawled_at", "headings", "paragraphs", "link_count", "status_code")
 
