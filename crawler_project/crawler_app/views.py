@@ -57,14 +57,15 @@ def start_crawl(request):
 
                 # ✅ Ergebnis speichern
                 CrawlResult.objects.update_or_create(
-                    url=data["url"],
+                    user=request.user,
+                    url=item["url"],
                     defaults={
-                    "title": data["title"],
-                    "description": data["description"],
-                    "headings": data["headings"],
-                    "paragraphs": data["paragraphs"],
-                    "link_count": data["link_count"],
-                    "status_code": data["status_code"],
+                    "title": item["title"],
+                    "description": item["description"],
+                    "headings": item["headings"],
+                    "paragraphs": item["paragraphs"],
+                    "link_count": item["link_count"],
+                    "status_code": item["status_code"],
                     "crawled_at": timezone.now(),
                     }
                 )
@@ -118,18 +119,4 @@ def request_delete_view(request):
         form = DeleteRequestForm()
 
     return render(request, "crawler_app/request_delete.html", {"form": form})
-
-
-@login_required
-def dashboard(request):
-    # ✅ Globale Ergebnisse (nicht mehr pro User)
-    results = CrawlResult.objects.all().order_by("-crawled_at")
-
-    # ✅ Logs bleiben pro User (optional)
-    logs = CrawlLog.objects.filter(user=request.user)[:50]
-
-    return render(request, "crawler_app/dashboard.html", {
-        "results": results,
-        "logs": logs,
-    })
 

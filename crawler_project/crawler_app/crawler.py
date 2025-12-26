@@ -71,12 +71,6 @@ class WebCrawler:
         # Set zur Verhinderung mehrfacher Einträge in der Queue
         self.to_visit_set = {self.normalize_url(u) for u in self.to_visit}
 
-        # SQLite DB initialisieren
-        try:
-            self.init_db()
-        except Exception:
-            logger.exception("Fehler beim Initialisieren der SQLite-DB")
-
     # ----------------- Hilfsfunktionen -----------------
 
     def normalize_url(self, url: str) -> str:
@@ -315,7 +309,6 @@ class WebCrawler:
                 if content:
                     content["status_code"] = status if status is not None else 0
                     self.data.append(content)
-                    self.save_record_to_db(content)
 
                 links = self.extract_links(url, html)
                 self.to_visit.extend(links)

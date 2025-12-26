@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 
 class CrawlResult(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="crawl_results")
-    url = models.URLField(unique=True)
+    url = models.URLField()
     title = models.CharField(max_length=255, blank=True)
     description = models.TextField(blank=True)
     headings = models.JSONField(default=list, blank=True)
@@ -15,6 +15,7 @@ class CrawlResult(models.Model):
 
     class Meta:
         db_table = "crawled"  # WICHTIG: gleiche Tabelle wie der Crawler
+        unique_together = ('user', 'url')
 
     def __str__(self):
         return f"{self.url} ({self.user.username})"
@@ -35,7 +36,7 @@ class DeleteRequest(models.Model):
     processed = models.BooleanField(default=False)
 
     def __str__(self):
-        return f"Anfrage von {self.user.username}: {self.request_type}"
+        return f"Anfrage: {self.request_type}"
 
 
 class CrawlLog(models.Model):
